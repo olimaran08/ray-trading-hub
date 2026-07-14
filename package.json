@@ -1,0 +1,17 @@
+{
+  "name": "ray-trading-hub",
+  "version": "1.0.0",
+  "description": "RAY Trading Hub - Paper trading engine for Indian intraday markets, driven by Chartink webhook alerts",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "node-fetch": "^2.7.0"
+  }
+}
