@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0B0E11" />
+<title>RAY TRADING HUB — Paper Trading Terminal</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%23C1440E%22/><text x=%2250%22 y=%2268%22 font-size=%2258%22 font-family=%22Georgia%22 fill=%22%23fff%22 text-anchor=%22middle%22>R</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="scanline" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">R</span>
+    <div class="brand-text">
+      <h1>RAY TRADING HUB</h1>
+      <span class="brand-sub">Intraday paper terminal · NSE</span>
+    </div>
+  </div>
+  <div class="status-cluster">
+    <span id="marketPill" class="pill pill-muted">Checking market…</span>
+    <span id="clock" class="clock">--:--:--</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero-pnl" id="heroPnl">
+    <div class="hero-pnl-label">Net P&amp;L — today</div>
+    <div class="hero-pnl-value" id="netPnlValue">₹0</div>
+    <div class="hero-pnl-sub">
+      <span>Realized <b id="realizedPnl">₹0</b></span>
+      <span class="dot">·</span>
+      <span>Unrealized <b id="unrealizedPnl">₹0</b></span>
+    </div>
+  </section>
+
+  <section class="stat-strip">
+    <div class="stat-card">
+      <span class="stat-num" id="statOpen">0</span>
+      <span class="stat-label">Open</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num" id="statClosed">0</span>
+      <span class="stat-label">Closed</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num" id="statWinRate">0%</span>
+      <span class="stat-label">Win rate</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num" id="statWL">0 / 0</span>
+      <span class="stat-label">Won / Lost</span>
+    </div>
+  </section>
+
+  <section class="rules-strip" id="rulesStrip">
+    <div class="rule"><span class="rule-k">Max investment / stock</span><span class="rule-v">₹1,25,000</span></div>
+    <div class="rule"><span class="rule-k">Leverage</span><span class="rule-v">5×</span></div>
+    <div class="rule"><span class="rule-k">Risk : Reward</span><span class="rule-v">1 : 2</span></div>
+    <div class="rule"><span class="rule-k">Max loss / trade</span><span class="rule-v loss">₹2,000</span></div>
+    <div class="rule"><span class="rule-k">Max profit / trade</span><span class="rule-v profit">₹4,000</span></div>
+    <div class="rule"><span class="rule-k">Auto square-off</span><span class="rule-v">3:00 PM IST</span></div>
+  </section>
+
+  <section class="board">
+    <div class="board-head">
+      <h2>Open positions</h2>
+      <span class="count-badge" id="openCount">0</span>
+    </div>
+    <div id="openList" class="ticket-grid">
+      <div class="empty-state">
+        <p>No open positions.</p>
+        <p class="empty-sub">They'll appear the instant a Chartink scan fires the webhook below.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="board">
+    <div class="board-head">
+      <h2>Closed trades</h2>
+      <span class="count-badge" id="closedCount">0</span>
+    </div>
+    <div id="closedTable" class="closed-table">
+      <div class="empty-state"><p>No closed trades yet.</p></div>
+    </div>
+  </section>
+
+  <section class="webhook-box">
+    <h2>Connect your Chartink scanners</h2>
+    <p class="webhook-copy">Paste this single URL into the webhook field of <b>both</b> your Chartink scan alerts. Every alert — from either scanner — opens a fresh paper position here automatically.</p>
+    <div class="webhook-url-row">
+      <code id="webhookUrl">loading…</code>
+      <button id="copyBtn" class="btn-copy">Copy</button>
+    </div>
+    <ol class="webhook-steps">
+      <li>Open your scan on Chartink → <b>Create Alert</b></li>
+      <li>Under "Webhook URL", paste the link above</li>
+      <li>Alert type must be able to POST stock name + trigger price (Chartink's default alert format)</li>
+      <li>Repeat for your second scanner — same URL works for both</li>
+    </ol>
+    <div class="test-row">
+      <span class="test-label">Test it now</span>
+      <input id="testSymbol" placeholder="SYMBOL e.g. RELIANCE" />
+      <input id="testPrice" placeholder="Price e.g. 1450" inputmode="decimal" />
+      <button id="testBtn" class="btn-test">Send test alert</button>
+    </div>
+    <p id="testMsg" class="test-msg"></p>
+  </section>
+
+  <footer class="foot">
+    <span>RAY TRADING HUB — 100% paper trading. No real orders are ever placed. Prices are delayed market data used only to simulate fills.</span>
+  </footer>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
