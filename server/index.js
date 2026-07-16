@@ -66,6 +66,32 @@ app.post('/api/trades/:id/close', async (req, res) => {
   res.json({ ok: true, trade: closed });
 });
 
+// Exit every open position right now, at current LTP.
+app.post('/api/trades/exit-all', async (req, res) => {
+  try {
+    const closed = await engine.exitAllOpenTrades();
+    res.json({ ok: true, closedCount: closed.length, trades: closed });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Day-by-day P&L history (Day 1, Day 2, ...).
+app.get('/api/day-history', (req, res) => {
+  res.json({ ok: true, days: store.getDayHistory() });
+});
+
+// Manually archive + clear today's board right now, instead of waiting for 8 PM.
+app.post('/api/day-history/archive-now', (req, res) => {
+  try {
+    const today = engine.istDateStr();
+    const record = store.archiveDay(today);
+    res.json({ ok: true, record });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/api/stats', (req, res) => {
   const trades = store.getAllTrades();
   const open = trades.filter(t => t.status === 'OPEN');
