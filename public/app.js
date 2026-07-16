@@ -109,6 +109,63 @@ async function closeTrade(id){
   refresh();
 }
 
+async function exitAll(){
+  const btn = document.getElementById('exitAllBtn');
+  btn.disabled = true;
+  btn.textContent = 'Exiting…';
+  try{
+    const r = await fetchJSON('/api/trades/exit-all', { method:'POST' });
+    if(r.ok){
+      btn.textContent = `Closed ${r.closedCount}`;
+      setTimeout(() => { btn.textContent = 'Exit all'; btn.disabled = false; }, 1500);
+    }
+  }catch(e){
+    btn.textContent = 'Exit all';
+    btn.disabled = false;
+  }
+  refresh();
+}
+
+function fmtDate(dateStr){
+  if(!dateStr) return '—';
+  const [y,m,d] = dateStr.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d} ${months[parseInt(m,10)-1]} ${y}`;
+}
+
+function renderDayHistory(days){
+  const box = document.getElementById('dayHistoryList');
+  document.getElementById('dayCount').textContent = days.length;
+
+  if(days.length === 0){
+    box.innerHTML = `<div class="empty-state"><p>No days recorded yet.</p></div>`;
+    return;
+  }
+
+  box.innerHTML = days.slice().reverse().map(d => {
+    const cls = d.netPnl >= 0 ? 'profit' : 'loss';
+    return `<div class="day-row">
+      <div class="day-row-left">
+        <span class="day-num">Day ${d.dayNumber}</span>
+        <span class="day-date">${fmtDate(d.date)}</span>
+      </div>
+      <div style="text-align:right;">
+        <div class="day-pnl ${cls}">${fmtMoney(d.netPnl)}</div>
+        <div class="day-meta">${d.tradeCount} trades · ${d.wins}W / ${d.losses}L</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function refreshDayHistory(){
+  try{
+    const r = await fetchJSON('/api/day-history');
+    if(r.ok) renderDayHistory(r.days);
+  }catch(e){
+    console.error('day history refresh failed', e);
+  }
+}
+
 async function refresh(){
   try{
     const [tradesRes, statsRes] = await Promise.all([
@@ -178,7 +235,10 @@ function setupWebhookBox(){
 }
 
 setupWebhookBox();
+document.getElementById('exitAllBtn').addEventListener('click', exitAll);
 tickClock();
 setInterval(tickClock, 1000);
 refresh();
+refreshDayHistory();
 setInterval(refresh, 5000);
+setInterval(refreshDayHistory, 30000);
