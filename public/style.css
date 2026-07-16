@@ -133,6 +133,29 @@ a{color:var(--accent);}
   background:var(--surface-2); color:var(--muted); font-family:var(--font-mono);
   font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border);
 }
+.btn-exit-all{
+  margin-left:auto; background:var(--loss-soft); color:var(--loss); border:1px solid rgba(229,72,77,0.4);
+  border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer;
+  font-family:var(--font-body);
+}
+.btn-exit-all:hover{background:var(--loss); color:#fff;}
+.btn-exit-all:disabled{opacity:0.4; cursor:default;}
+
+/* ---------- daily history ---------- */
+.day-history-note{font-size:12px; color:var(--muted); margin:-4px 0 12px;}
+.day-history-list{display:flex; flex-direction:column; gap:8px;}
+.day-row{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  padding:12px 16px;
+}
+.day-row-left{display:flex; flex-direction:column;}
+.day-num{font-family:var(--font-display); font-weight:700; font-size:13px;}
+.day-date{font-size:11px; color:var(--muted);}
+.day-pnl{font-family:var(--font-mono); font-weight:600; font-size:17px;}
+.day-pnl.profit{color:var(--profit);}
+.day-pnl.loss{color:var(--loss);}
+.day-meta{font-size:11px; color:var(--muted); text-align:right;}
 
 .empty-state{
   border:1px dashed var(--border); border-radius:14px; padding:26px 16px; text-align:center;
