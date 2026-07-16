@@ -50,4 +50,79 @@ function getOpenTrades() {
   return getAllTrades().filter(t => t.status === 'OPEN');
 }
 
-module.exports = { getAllTrades, addTrade, updateTrade, getOpenTrades };
+function clearAllTrades() {
+  const data = read();
+  data.trades = [];
+  write(data);
+}
+
+// ---------------------------------------------------------------------
+// Day history — one summary line per trading day (date + net P&L),
+// written when the day is archived. Individual trades are wiped after.
+// ---------------------------------------------------------------------
+const HISTORY_FILE = path.join(DATA_DIR, 'day-history.json');
+
+if (!fs.existsSync(HISTORY_FILE)) {
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify({ days: [], lastArchivedDate: null }, null, 2));
+}
+
+function readHistory() {
+  try {
+    return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+  } catch (e) {
+    return { days: [], lastArchivedDate: null };
+  }
+}
+
+function writeHistory(data) {
+  const tmp = HISTORY_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.renameSync(tmp, HISTORY_FILE);
+}
+
+function getDayHistory() {
+  return readHistory().days;
+}
+
+function getLastArchivedDate() {
+  return readHistory().lastArchivedDate;
+}
+
+// Summarize today's trades into one record, save it, then wipe the
+// live trade list clean for the next day.
+function archiveDay(dateStr) {
+  const trades = getAllTrades();
+  if (trades.length === 0) {
+    // Nothing traded today — still mark the date so we don't re-check all day.
+    const h = readHistory();
+    h.lastArchivedDate = dateStr;
+    writeHistory(h);
+    return null;
+  }
+
+  const netPnl = trades.reduce((s, t) => s + (t.pnl || 0), 0);
+  const wins = trades.filter(t => t.pnl > 0).length;
+  const losses = trades.filter(t => t.pnl <= 0).length;
+
+  const h = readHistory();
+  const record = {
+    dayNumber: h.days.length + 1,
+    date: dateStr,
+    netPnl: Math.round(netPnl * 100) / 100,
+    tradeCount: trades.length,
+    wins,
+    losses,
+    archivedAt: new Date().toISOString(),
+  };
+  h.days.push(record);
+  h.lastArchivedDate = dateStr;
+  writeHistory(h);
+
+  clearAllTrades();
+  return record;
+}
+
+module.exports = {
+  getAllTrades, addTrade, updateTrade, getOpenTrades, clearAllTrades,
+  getDayHistory, getLastArchivedDate, archiveDay,
+};
