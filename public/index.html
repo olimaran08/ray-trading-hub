@@ -73,6 +73,7 @@
     <div class="board-head">
       <h2>Open positions</h2>
       <span class="count-badge" id="openCount">0</span>
+      <button id="exitAllBtn" class="btn-exit-all">Exit all</button>
     </div>
     <div id="openList" class="ticket-grid">
       <div class="empty-state">
@@ -89,6 +90,17 @@
     </div>
     <div id="closedTable" class="closed-table">
       <div class="empty-state"><p>No closed trades yet.</p></div>
+    </div>
+  </section>
+
+  <section class="board">
+    <div class="board-head">
+      <h2>Daily P&amp;L history</h2>
+      <span class="count-badge" id="dayCount">0</span>
+    </div>
+    <p class="day-history-note">Auto-saved and cleared every day at 8:00 PM IST. Only the day's total — no leftover stock list.</p>
+    <div id="dayHistoryList" class="day-history-list">
+      <div class="empty-state"><p>No days recorded yet.</p></div>
     </div>
   </section>
 
