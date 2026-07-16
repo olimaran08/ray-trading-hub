@@ -1,3 +1,4 @@
+
 const store = require('./store');
 const { getLTP } = require('./priceFeed');
 
@@ -10,6 +11,8 @@ const RULES = {
   RISK_REWARD: 2,                    // 1:2 — implied by 2000 / 4000 above
   SQUARE_OFF_HOUR: 15,               // 3:00 PM IST — force-close everything open
   SQUARE_OFF_MINUTE: 0,
+  ARCHIVE_HOUR: 20,                  // 8:00 PM IST — snapshot the day's P&L and wipe the board
+  ARCHIVE_MINUTE: 0,
   MARKET_OPEN: { h: 9, m: 15 },
   MARKET_CLOSE: { h: 15, m: 30 },
 };
@@ -19,6 +22,14 @@ function istNow() {
   const now = new Date();
   const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
   return new Date(utcMs + 5.5 * 60 * 60000);
+}
+
+function istDateStr(d = istNow()) {
+  // YYYY-MM-DD in IST, used as the day-history key.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function isMarketHours(d = istNow()) {
@@ -32,6 +43,12 @@ function isMarketHours(d = istNow()) {
 function pastSquareOff(d = istNow()) {
   const mins = d.getHours() * 60 + d.getMinutes();
   const cutoff = RULES.SQUARE_OFF_HOUR * 60 + RULES.SQUARE_OFF_MINUTE;
+  return mins >= cutoff;
+}
+
+function pastArchiveTime(d = istNow()) {
+  const mins = d.getHours() * 60 + d.getMinutes();
+  const cutoff = RULES.ARCHIVE_HOUR * 60 + RULES.ARCHIVE_MINUTE;
   return mins >= cutoff;
 }
 
@@ -84,11 +101,38 @@ function closeTrade(trade, exitPrice, reason) {
   });
 }
 
+// Immediately close every open position at current LTP — used by the
+// "Exit All" button.
+async function exitAllOpenTrades() {
+  const open = store.getOpenTrades();
+  const closed = [];
+  for (const trade of open) {
+    const ltp = await getLTP(trade.symbol);
+    const exitPrice = ltp == null ? trade.ltp : ltp;
+    closed.push(closeTrade(trade, exitPrice, 'MANUAL EXIT ALL'));
+  }
+  return closed;
+}
+
+// Once past 8:00 PM IST, snapshot today's P&L into day-history and
+// wipe the live board clean, ready for tomorrow. Runs at most once
+// per calendar day (IST).
+function checkDayArchive() {
+  const now = istNow();
+  if (!pastArchiveTime(now)) return null;
+  const today = istDateStr(now);
+  if (store.getLastArchivedDate() === today) return null; // already done today
+  return store.archiveDay(today);
+}
+
 // Poll all open positions: update LTP, auto-book target/SL, force
 // square-off at 3:00 PM IST.
 async function monitorOpenTrades() {
   const open = store.getOpenTrades();
-  if (open.length === 0) return;
+  if (open.length === 0) {
+    checkDayArchive();
+    return;
+  }
 
   const now = istNow();
   const forceClose = pastSquareOff(now);
@@ -111,6 +155,8 @@ async function monitorOpenTrades() {
       store.updateTrade(trade.id, { ltp: round2(ltp), pnl });
     }
   }
+
+  checkDayArchive();
 }
 
 function startMonitorLoop(intervalMs = 15000) {
@@ -122,10 +168,14 @@ function startMonitorLoop(intervalMs = 15000) {
 module.exports = {
   RULES,
   istNow,
+  istDateStr,
   isMarketHours,
   pastSquareOff,
+  pastArchiveTime,
   openTradeFromAlert,
   closeTrade,
+  exitAllOpenTrades,
+  checkDayArchive,
   monitorOpenTrades,
   startMonitorLoop,
 };
