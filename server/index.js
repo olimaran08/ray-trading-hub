@@ -38,8 +38,9 @@ app.post('/webhook/chartink', (req, res) => {
       return engine.openTradeFromAlert({ symbol, price, scanName, alertName });
     }).filter(Boolean);
 
-    console.log(`[webhook] ${scanName}: opened ${created.length} paper trade(s)`);
-    res.json({ ok: true, opened: created.length, trades: created });
+    const skipped = symbols.length - created.length;
+    console.log(`[webhook] ${scanName}: opened ${created.length} paper trade(s), skipped ${skipped} duplicate(s)`);
+    res.json({ ok: true, opened: created.length, skippedDuplicates: skipped, trades: created });
   } catch (err) {
     console.error('[webhook] error:', err);
     res.status(500).json({ ok: false, error: err.message });
@@ -51,6 +52,9 @@ app.post('/api/trades/manual', (req, res) => {
   const { symbol, price, scanName } = req.body;
   if (!symbol || !price) return res.status(400).json({ ok: false, error: 'symbol and price required' });
   const trade = engine.openTradeFromAlert({ symbol, price: parseFloat(price), scanName: scanName || 'Manual' });
+  if (!trade) {
+    return res.json({ ok: false, error: `${symbol.toUpperCase()} already has a trade today — skipped duplicate.` });
+  }
   res.json({ ok: true, trade });
 });
 
@@ -79,6 +83,15 @@ app.post('/api/trades/exit-all', async (req, res) => {
 // Day-by-day P&L history (Day 1, Day 2, ...).
 app.get('/api/day-history', (req, res) => {
   res.json({ ok: true, days: store.getDayHistory() });
+});
+
+// Wipe only one scanner's trades — for when a scanner's still being
+// tuned and its test trades have piled up. Other scanners untouched.
+app.post('/api/trades/reset-scanner', (req, res) => {
+  const { scanName } = req.body;
+  if (!scanName) return res.status(400).json({ ok: false, error: 'scanName required' });
+  const removed = store.clearTradesByScanner(scanName);
+  res.json({ ok: true, removed, scanName });
 });
 
 // Manually archive + clear today's board right now, instead of waiting for 8 PM.
