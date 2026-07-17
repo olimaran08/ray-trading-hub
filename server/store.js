@@ -56,6 +56,17 @@ function clearAllTrades() {
   write(data);
 }
 
+// Remove only the trades belonging to one scanner — used when testing
+// a scanner and wanting a clean slate for just that one, without
+// touching other scanners' trades or the rest of the day's board.
+function clearTradesByScanner(scanName) {
+  const data = read();
+  const before = data.trades.length;
+  data.trades = data.trades.filter(t => t.scanName !== scanName);
+  write(data);
+  return before - data.trades.length; // count removed
+}
+
 // ---------------------------------------------------------------------
 // Day history — one summary line per trading day (date + net P&L),
 // written when the day is archived. Individual trades are wiped after.
@@ -123,6 +134,6 @@ function archiveDay(dateStr) {
 }
 
 module.exports = {
-  getAllTrades, addTrade, updateTrade, getOpenTrades, clearAllTrades,
+  getAllTrades, addTrade, updateTrade, getOpenTrades, clearAllTrades, clearTradesByScanner,
   getDayHistory, getLastArchivedDate, archiveDay,
 };
