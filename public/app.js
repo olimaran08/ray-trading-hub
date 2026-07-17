@@ -1,4 +1,6 @@
 const API = '';
+let selectedScanner = 'ALL';
+let lastTrades = [];
 
 function fmtMoney(n){
   const sign = n < 0 ? '-' : '';
@@ -15,11 +17,17 @@ async function fetchJSON(url, opts){
   return res.json();
 }
 
+function applyFilter(trades){
+  if(selectedScanner === 'ALL') return trades;
+  return trades.filter(t => t.scanName === selectedScanner);
+}
+
 function renderOpen(trades){
   const list = document.getElementById('openList');
-  const open = trades.filter(t => t.status === 'OPEN');
-  document.getElementById('openCount').textContent = open.length;
-  document.getElementById('statOpen').textContent = open.length;
+  const open = applyFilter(trades.filter(t => t.status === 'OPEN'));
+  const openTotal = trades.filter(t => t.status === 'OPEN').length;
+  document.getElementById('openCount').textContent = selectedScanner === 'ALL' ? openTotal : `${open.length} / ${openTotal}`;
+  document.getElementById('statOpen').textContent = openTotal;
 
   if(open.length === 0){
     list.innerHTML = `<div class="empty-state"><p>No open positions.</p><p class="empty-sub">They'll appear the instant a Chartink scan fires the webhook below.</p></div>`;
@@ -56,9 +64,10 @@ function renderOpen(trades){
 
 function renderClosed(trades){
   const box = document.getElementById('closedTable');
-  const closed = trades.filter(t => t.status === 'CLOSED');
-  document.getElementById('closedCount').textContent = closed.length;
-  document.getElementById('statClosed').textContent = closed.length;
+  const closed = applyFilter(trades.filter(t => t.status === 'CLOSED'));
+  const closedTotal = trades.filter(t => t.status === 'CLOSED').length;
+  document.getElementById('closedCount').textContent = selectedScanner === 'ALL' ? closedTotal : `${closed.length} / ${closedTotal}`;
+  document.getElementById('statClosed').textContent = closedTotal;
 
   if(closed.length === 0){
     box.innerHTML = `<div class="empty-state"><p>No closed trades yet.</p></div>`;
@@ -81,6 +90,65 @@ function renderClosed(trades){
   }).join('');
 
   box.innerHTML = head + rows;
+}
+
+function populateScannerFilter(trades){
+  const select = document.getElementById('scannerFilter');
+  const scanners = [...new Set(trades.map(t => t.scanName).filter(Boolean))].sort();
+  const current = select.value || 'ALL';
+
+  select.innerHTML = `<option value="ALL">All scanners</option>` +
+    scanners.map(s => `<option value="${s}">${s}</option>`).join('');
+
+  // Keep the user's selection if that scanner still exists, else reset to ALL.
+  if(scanners.includes(current) || current === 'ALL'){
+    select.value = current;
+    selectedScanner = current;
+  } else {
+    select.value = 'ALL';
+    selectedScanner = 'ALL';
+  }
+}
+
+function renderScannerPerf(trades){
+  const box = document.getElementById('scannerPerf');
+  const byScanner = {};
+  trades.forEach(t => {
+    const name = t.scanName || 'Unknown';
+    if(!byScanner[name]) byScanner[name] = { name, trades: 0, wins: 0, losses: 0, pnl: 0 };
+    byScanner[name].trades++;
+    byScanner[name].pnl += (t.pnl || 0);
+    if(t.status === 'CLOSED'){
+      if(t.pnl > 0) byScanner[name].wins++;
+      else byScanner[name].losses++;
+    }
+  });
+
+  const rows = Object.values(byScanner).sort((a,b) => b.pnl - a.pnl);
+  document.getElementById('scannerCount').textContent = rows.length;
+
+  if(rows.length === 0){
+    box.innerHTML = `<div class="empty-state"><p>No trades yet today.</p></div>`;
+    return;
+  }
+
+  const maxAbsPnl = Math.max(...rows.map(r => Math.abs(r.pnl)), 1);
+
+  box.innerHTML = rows.map((r, i) => {
+    const cls = r.pnl >= 0 ? 'profit' : 'loss';
+    const decided = r.wins + r.losses;
+    const winRate = decided ? Math.round((r.wins / decided) * 100) : 0;
+    const barWidth = Math.round((Math.abs(r.pnl) / maxAbsPnl) * 100);
+    return `<div class="scanner-row">
+      <span class="scanner-rank">#${i+1}</span>
+      <div class="scanner-name-col">
+        <div class="scanner-name">${r.name}</div>
+        <div class="scanner-sub">${r.trades} trades · ${winRate}% win rate (${r.wins}W/${r.losses}L)</div>
+        <div class="scanner-bar-track"><div class="scanner-bar-fill ${cls}" style="width:${barWidth}%"></div></div>
+      </div>
+      <span class="scanner-pnl ${cls}">${fmtMoney(r.pnl)}</span>
+    </div>`;
+  }).join('');
 }
 
 function renderStats(stats, marketOpen){
@@ -173,8 +241,11 @@ async function refresh(){
       fetchJSON('/api/stats'),
     ]);
     if(tradesRes.ok){
-      renderOpen(tradesRes.trades);
-      renderClosed(tradesRes.trades);
+      lastTrades = tradesRes.trades;
+      populateScannerFilter(lastTrades);
+      renderOpen(lastTrades);
+      renderClosed(lastTrades);
+      renderScannerPerf(lastTrades);
     }
     if(statsRes.ok){
       renderStats(statsRes.stats, statsRes.marketOpen);
@@ -236,6 +307,11 @@ function setupWebhookBox(){
 
 setupWebhookBox();
 document.getElementById('exitAllBtn').addEventListener('click', exitAll);
+document.getElementById('scannerFilter').addEventListener('change', (e) => {
+  selectedScanner = e.target.value;
+  renderOpen(lastTrades);
+  renderClosed(lastTrades);
+});
 tickClock();
 setInterval(tickClock, 1000);
 refresh();
