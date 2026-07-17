@@ -108,6 +108,7 @@ function populateScannerFilter(trades){
     select.value = 'ALL';
     selectedScanner = 'ALL';
   }
+  document.getElementById('resetScannerBtn').style.display = selectedScanner === 'ALL' ? 'none' : 'inline-block';
 }
 
 function renderScannerPerf(trades){
@@ -305,10 +306,38 @@ function setupWebhookBox(){
   });
 }
 
+async function resetSelectedScanner(){
+  if(selectedScanner === 'ALL') return;
+  const confirmed = confirm(`Reset "${selectedScanner}"? This deletes all of its trades today — open and closed. Other scanners are untouched. This can't be undone.`);
+  if(!confirmed) return;
+
+  const btn = document.getElementById('resetScannerBtn');
+  btn.disabled = true;
+  btn.textContent = 'Resetting…';
+  try{
+    const r = await fetchJSON('/api/trades/reset-scanner', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ scanName: selectedScanner })
+    });
+    if(r.ok){
+      btn.textContent = `Removed ${r.removed}`;
+      selectedScanner = 'ALL';
+      setTimeout(() => { btn.textContent = 'Reset this scanner'; btn.disabled = false; }, 1500);
+    }
+  }catch(e){
+    btn.textContent = 'Reset this scanner';
+    btn.disabled = false;
+  }
+  refresh();
+}
+
 setupWebhookBox();
 document.getElementById('exitAllBtn').addEventListener('click', exitAll);
+document.getElementById('resetScannerBtn').addEventListener('click', resetSelectedScanner);
 document.getElementById('scannerFilter').addEventListener('change', (e) => {
   selectedScanner = e.target.value;
+  document.getElementById('resetScannerBtn').style.display = selectedScanner === 'ALL' ? 'none' : 'inline-block';
   renderOpen(lastTrades);
   renderClosed(lastTrades);
 });
