@@ -71,6 +71,24 @@
 
   <section class="board">
     <div class="board-head">
+      <h2>Scanner performance</h2>
+      <span class="count-badge" id="scannerCount">0</span>
+    </div>
+    <p class="day-history-note">Compares your scanners head-to-head — today's trades only.</p>
+    <div id="scannerPerf" class="scanner-perf-list">
+      <div class="empty-state"><p>No trades yet today.</p></div>
+    </div>
+  </section>
+
+  <section class="filter-bar">
+    <span class="filter-label">Filter by scanner</span>
+    <select id="scannerFilter" class="scanner-select">
+      <option value="ALL">All scanners</option>
+    </select>
+  </section>
+
+  <section class="board">
+    <div class="board-head">
       <h2>Open positions</h2>
       <span class="count-badge" id="openCount">0</span>
       <button id="exitAllBtn" class="btn-exit-all">Exit all</button>
