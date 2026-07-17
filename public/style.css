@@ -141,6 +141,38 @@ a{color:var(--accent);}
 .btn-exit-all:hover{background:var(--loss); color:#fff;}
 .btn-exit-all:disabled{opacity:0.4; cursor:default;}
 
+/* ---------- scanner performance ---------- */
+.scanner-perf-list{display:flex; flex-direction:column; gap:8px;}
+.scanner-row{
+  display:flex; align-items:center; gap:12px; background:var(--surface);
+  border:1px solid var(--border); border-radius:10px; padding:12px 16px;
+}
+.scanner-rank{
+  font-family:var(--font-mono); font-size:11px; color:var(--muted); width:20px; flex-shrink:0;
+}
+.scanner-name-col{flex:1; min-width:0;}
+.scanner-name{font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.scanner-sub{font-size:11px; color:var(--muted);}
+.scanner-pnl{font-family:var(--font-mono); font-weight:600; font-size:15px; text-align:right; flex-shrink:0;}
+.scanner-pnl.profit{color:var(--profit);}
+.scanner-pnl.loss{color:var(--loss);}
+.scanner-bar-track{
+  height:4px; background:var(--surface-2); border-radius:99px; margin-top:6px; overflow:hidden;
+}
+.scanner-bar-fill{height:100%; border-radius:99px;}
+.scanner-bar-fill.profit{background:var(--profit);}
+.scanner-bar-fill.loss{background:var(--loss);}
+
+/* ---------- filter bar ---------- */
+.filter-bar{
+  display:flex; align-items:center; gap:10px; margin-bottom:16px;
+}
+.filter-label{font-size:12px; color:var(--muted); white-space:nowrap;}
+.scanner-select{
+  flex:1; background:var(--surface); border:1px solid var(--border); border-radius:9px;
+  padding:9px 12px; color:var(--text); font-size:13px; font-family:var(--font-body);
+}
+
 /* ---------- daily history ---------- */
 .day-history-note{font-size:12px; color:var(--muted); margin:-4px 0 12px;}
 .day-history-list{display:flex; flex-direction:column; gap:8px;}
