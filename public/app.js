@@ -56,7 +56,7 @@ function renderOpen(trades){
 
 function renderClosed(trades){
   const box = document.getElementById('closedTable');
-  const closed = trades.filter(t => t.status === 'CLOSED').slice(0, 40);
+  const closed = trades.filter(t => t.status === 'CLOSED');
   document.getElementById('closedCount').textContent = closed.length;
   document.getElementById('statClosed').textContent = closed.length;
 
