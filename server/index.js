@@ -39,8 +39,8 @@ app.post('/webhook/chartink', (req, res) => {
     }).filter(Boolean);
 
     const skipped = symbols.length - created.length;
-    console.log(`[webhook] ${scanName}: opened ${created.length} paper trade(s), skipped ${skipped} duplicate(s)`);
-    res.json({ ok: true, opened: created.length, skippedDuplicates: skipped, trades: created });
+    console.log(`[webhook] ${scanName}: opened ${created.length} paper trade(s), skipped ${skipped} (duplicate stock or past 1:00 PM cutoff)`);
+    res.json({ ok: true, opened: created.length, skipped, trades: created });
   } catch (err) {
     console.error('[webhook] error:', err);
     res.status(500).json({ ok: false, error: err.message });
@@ -53,7 +53,10 @@ app.post('/api/trades/manual', (req, res) => {
   if (!symbol || !price) return res.status(400).json({ ok: false, error: 'symbol and price required' });
   const trade = engine.openTradeFromAlert({ symbol, price: parseFloat(price), scanName: scanName || 'Manual' });
   if (!trade) {
-    return res.json({ ok: false, error: `${symbol.toUpperCase()} already has a trade today — skipped duplicate.` });
+    const reason = engine.pastEntryCutoff()
+      ? 'past 1:00 PM entry cutoff — no new trades taken after this time.'
+      : `${symbol.toUpperCase()} already has a trade today — skipped duplicate.`;
+    return res.json({ ok: false, error: reason });
   }
   res.json({ ok: true, trade });
 });
