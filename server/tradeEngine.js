@@ -1,4 +1,3 @@
-
 const store = require('./store');
 const { getLTP } = require('./priceFeed');
 
@@ -11,6 +10,8 @@ const RULES = {
   RISK_REWARD: 2,                    // 1:2 — implied by 2000 / 4000 above
   SQUARE_OFF_HOUR: 15,               // 3:00 PM IST — force-close everything open
   SQUARE_OFF_MINUTE: 0,
+  ENTRY_CUTOFF_HOUR: 13,              // 1:00 PM IST — stop taking fresh trades from here
+  ENTRY_CUTOFF_MINUTE: 0,
   ARCHIVE_HOUR: 20,                  // 8:00 PM IST — snapshot the day's P&L and wipe the board
   ARCHIVE_MINUTE: 0,
   MARKET_OPEN: { h: 9, m: 15 },
@@ -46,14 +47,39 @@ function pastSquareOff(d = istNow()) {
   return mins >= cutoff;
 }
 
+function pastEntryCutoff(d = istNow()) {
+  const mins = d.getHours() * 60 + d.getMinutes();
+  const cutoff = RULES.ENTRY_CUTOFF_HOUR * 60 + RULES.ENTRY_CUTOFF_MINUTE;
+  return mins >= cutoff;
+}
+
 function pastArchiveTime(d = istNow()) {
   const mins = d.getHours() * 60 + d.getMinutes();
   const cutoff = RULES.ARCHIVE_HOUR * 60 + RULES.ARCHIVE_MINUTE;
   return mins >= cutoff;
 }
 
+// Since the board is wiped clean at 8 PM archive, "today" is simply
+// whatever's currently sitting in the trade list — so a same-symbol
+// check against all current trades is a same-day check.
+function alreadyTradedToday(symbol) {
+  const upper = symbol.toUpperCase();
+  return store.getAllTrades().some(t => t.symbol.toUpperCase() === upper);
+}
+
 // Build a new paper position from a Chartink alert for a single symbol.
+// Returns null (and takes no action) if this stock already has a trade
+// today — only the first scanner to fire on a stock gets taken.
 function openTradeFromAlert({ symbol, price, scanName, alertName }) {
+  if (pastEntryCutoff()) {
+    console.log(`[tradeEngine] skipped ${symbol.toUpperCase()} — past 1:00 PM entry cutoff (from ${scanName})`);
+    return null;
+  }
+  if (alreadyTradedToday(symbol)) {
+    console.log(`[tradeEngine] skipped ${symbol.toUpperCase()} — already traded today (from ${scanName})`);
+    return null;
+  }
+
   const qty = Math.max(1, Math.floor(RULES.MAX_INVESTMENT_PER_STOCK / price));
   const exposure = qty * price;
   const margin = exposure / RULES.LEVERAGE;
@@ -171,7 +197,9 @@ module.exports = {
   istDateStr,
   isMarketHours,
   pastSquareOff,
+  pastEntryCutoff,
   pastArchiveTime,
+  alreadyTradedToday,
   openTradeFromAlert,
   closeTrade,
   exitAllOpenTrades,
