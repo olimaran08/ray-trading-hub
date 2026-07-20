@@ -152,7 +152,7 @@ function renderScannerPerf(trades){
   }).join('');
 }
 
-function renderStats(stats, marketOpen){
+function renderStats(stats, marketOpen, haltedForToday){
   const hero = document.getElementById('heroPnl');
   const netVal = document.getElementById('netPnlValue');
   netVal.textContent = fmtMoney(stats.netPnl);
@@ -171,6 +171,9 @@ function renderStats(stats, marketOpen){
     pill.textContent = 'Market closed';
     pill.className = 'pill pill-closed';
   }
+
+  document.getElementById('closeForTodayBtn').style.display = haltedForToday ? 'none' : 'block';
+  document.getElementById('haltedBanner').style.display = haltedForToday ? 'flex' : 'none';
 }
 
 async function closeTrade(id){
@@ -192,6 +195,33 @@ async function exitAll(){
     btn.textContent = 'Exit all';
     btn.disabled = false;
   }
+  refresh();
+}
+
+async function closeForToday(){
+  const confirmed = confirm('Close for today? This exits every open position right now and stops all new trades — from any scanner — for the rest of today. You can undo this with "Resume trading" if you change your mind.');
+  if(!confirmed) return;
+
+  const btn = document.getElementById('closeForTodayBtn');
+  btn.disabled = true;
+  btn.textContent = 'Closing…';
+  try{
+    const r = await fetchJSON('/api/trades/close-for-today', { method:'POST' });
+    if(r.ok){
+      btn.textContent = `Closed ${r.closedCount} · Halted`;
+    }
+  }catch(e){
+    btn.disabled = false;
+    btn.textContent = 'Close for today — lock in this profit';
+  }
+  refresh();
+}
+
+async function resumeTrading(){
+  await fetchJSON('/api/trades/resume-trading', { method:'POST' });
+  const btn = document.getElementById('closeForTodayBtn');
+  btn.disabled = false;
+  btn.textContent = 'Close for today — lock in this profit';
   refresh();
 }
 
@@ -249,7 +279,7 @@ async function refresh(){
       renderScannerPerf(lastTrades);
     }
     if(statsRes.ok){
-      renderStats(statsRes.stats, statsRes.marketOpen);
+      renderStats(statsRes.stats, statsRes.marketOpen, statsRes.haltedForToday);
     }
   }catch(e){
     console.error('refresh failed', e);
@@ -334,6 +364,8 @@ async function resetSelectedScanner(){
 
 setupWebhookBox();
 document.getElementById('exitAllBtn').addEventListener('click', exitAll);
+document.getElementById('closeForTodayBtn').addEventListener('click', closeForToday);
+document.getElementById('resumeTradingBtn').addEventListener('click', resumeTrading);
 document.getElementById('resetScannerBtn').addEventListener('click', resetSelectedScanner);
 document.getElementById('scannerFilter').addEventListener('change', (e) => {
   selectedScanner = e.target.value;
