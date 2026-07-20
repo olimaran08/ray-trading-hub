@@ -71,6 +71,10 @@ function alreadyTradedToday(symbol) {
 // Returns null (and takes no action) if this stock already has a trade
 // today — only the first scanner to fire on a stock gets taken.
 function openTradeFromAlert({ symbol, price, scanName, alertName }) {
+  if (store.isHalted()) {
+    console.log(`[tradeEngine] skipped ${symbol.toUpperCase()} — trading halted for today (from ${scanName})`);
+    return null;
+  }
   if (pastEntryCutoff()) {
     console.log(`[tradeEngine] skipped ${symbol.toUpperCase()} — past 1:00 PM entry cutoff (from ${scanName})`);
     return null;
@@ -140,6 +144,20 @@ async function exitAllOpenTrades() {
   return closed;
 }
 
+// "I'm happy with today's number, stop here." Closes every open
+// position right now AND blocks any further alerts (from any scanner)
+// from opening new trades for the rest of today. Automatically lifts
+// at the next day's 8 PM archive.
+async function closeForToday() {
+  const closed = await exitAllOpenTrades();
+  store.setHalted(true);
+  return closed;
+}
+
+function resumeTrading() {
+  store.setHalted(false);
+}
+
 // Once past 8:00 PM IST, snapshot today's P&L into day-history and
 // wipe the live board clean, ready for tomorrow. Runs at most once
 // per calendar day (IST).
@@ -203,6 +221,8 @@ module.exports = {
   openTradeFromAlert,
   closeTrade,
   exitAllOpenTrades,
+  closeForToday,
+  resumeTrading,
   checkDayArchive,
   monitorOpenTrades,
   startMonitorLoop,
