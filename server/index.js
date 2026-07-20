@@ -53,7 +53,9 @@ app.post('/api/trades/manual', (req, res) => {
   if (!symbol || !price) return res.status(400).json({ ok: false, error: 'symbol and price required' });
   const trade = engine.openTradeFromAlert({ symbol, price: parseFloat(price), scanName: scanName || 'Manual' });
   if (!trade) {
-    const reason = engine.pastEntryCutoff()
+    const reason = store.isHalted()
+      ? 'trading is halted for today — tap "Resume trading" to allow new trades again.'
+      : engine.pastEntryCutoff()
       ? 'past 1:00 PM entry cutoff — no new trades taken after this time.'
       : `${symbol.toUpperCase()} already has a trade today — skipped duplicate.`;
     return res.json({ ok: false, error: reason });
@@ -81,6 +83,23 @@ app.post('/api/trades/exit-all', async (req, res) => {
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// Lock in today's result: close everything now, and refuse any new
+// trades (from any scanner) for the rest of today.
+app.post('/api/trades/close-for-today', async (req, res) => {
+  try {
+    const closed = await engine.closeForToday();
+    res.json({ ok: true, closedCount: closed.length, trades: closed, halted: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Change your mind — lift the halt and let today's trades resume.
+app.post('/api/trades/resume-trading', (req, res) => {
+  engine.resumeTrading();
+  res.json({ ok: true, halted: false });
 });
 
 // Day-by-day P&L history (Day 1, Day 2, ...).
@@ -131,6 +150,7 @@ app.get('/api/stats', (req, res) => {
     },
     rules: engine.RULES,
     marketOpen: engine.isMarketHours(),
+    haltedForToday: store.isHalted(),
   });
 });
 
