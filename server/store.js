@@ -50,6 +50,22 @@ function getOpenTrades() {
   return getAllTrades().filter(t => t.status === 'OPEN');
 }
 
+// ---------------------------------------------------------------------
+// Trading halt — a manual "I'm done for today, lock in the profit"
+// switch. When set, no new trades open (existing ones aren't touched
+// by this alone — pair it with exitAllOpenTrades to close everything
+// too). Automatically clears at the next day's archive.
+// ---------------------------------------------------------------------
+function isHalted() {
+  return !!read().halted;
+}
+
+function setHalted(value) {
+  const data = read();
+  data.halted = !!value;
+  write(data);
+}
+
 function clearAllTrades() {
   const data = read();
   data.trades = [];
@@ -108,6 +124,7 @@ function archiveDay(dateStr) {
     const h = readHistory();
     h.lastArchivedDate = dateStr;
     writeHistory(h);
+    setHalted(false); // fresh day, fresh start
     return null;
   }
 
@@ -130,10 +147,11 @@ function archiveDay(dateStr) {
   writeHistory(h);
 
   clearAllTrades();
+  setHalted(false); // fresh day, fresh start
   return record;
 }
 
 module.exports = {
   getAllTrades, addTrade, updateTrade, getOpenTrades, clearAllTrades, clearTradesByScanner,
-  getDayHistory, getLastArchivedDate, archiveDay,
+  getDayHistory, getLastArchivedDate, archiveDay, isHalted, setHalted,
 };
