@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const store = require('./store');
 const engine = require('./tradeEngine');
+const { buildTradeReport } = require('./exportReport');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -100,6 +101,33 @@ app.post('/api/trades/close-for-today', async (req, res) => {
 app.post('/api/trades/resume-trading', (req, res) => {
   engine.resumeTrading();
   res.json({ ok: true, halted: false });
+});
+
+// Download a color-coded Excel report — entry/exit time, price, P&L,
+// green rows for profit, red for loss. Optional ?scanner=Name to get
+// just one scanner's trades; omit or use ALL for everything today.
+app.get('/api/export', async (req, res) => {
+  try {
+    const scanner = req.query.scanner;
+    let trades = store.getAllTrades();
+    if (scanner && scanner !== 'ALL') {
+      trades = trades.filter(t => t.scanName === scanner);
+    }
+
+    const label = scanner && scanner !== 'ALL' ? scanner : 'All Scanners';
+    const buffer = await buildTradeReport(trades, label);
+
+    const today = engine.istDateStr();
+    const safeLabel = label.replace(/[^a-z0-9]+/gi, '-');
+    const filename = `RAY-Trading-Hub_${safeLabel}_${today}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err) {
+    console.error('[export] error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // Day-by-day P&L history (Day 1, Day 2, ...).
