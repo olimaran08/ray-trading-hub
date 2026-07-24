@@ -367,6 +367,10 @@ document.getElementById('exitAllBtn').addEventListener('click', exitAll);
 document.getElementById('closeForTodayBtn').addEventListener('click', closeForToday);
 document.getElementById('resumeTradingBtn').addEventListener('click', resumeTrading);
 document.getElementById('resetScannerBtn').addEventListener('click', resetSelectedScanner);
+document.getElementById('downloadReportBtn').addEventListener('click', () => {
+  const scanner = encodeURIComponent(selectedScanner);
+  window.location.href = `/api/export?scanner=${scanner}`;
+});
 document.getElementById('scannerFilter').addEventListener('change', (e) => {
   selectedScanner = e.target.value;
   document.getElementById('resetScannerBtn').style.display = selectedScanner === 'ALL' ? 'none' : 'inline-block';
