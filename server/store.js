@@ -125,6 +125,7 @@ function archiveDay(dateStr) {
     h.lastArchivedDate = dateStr;
     writeHistory(h);
     setHalted(false); // fresh day, fresh start
+    clearPnlSnapshots();
     return null;
   }
 
@@ -148,10 +149,52 @@ function archiveDay(dateStr) {
 
   clearAllTrades();
   setHalted(false); // fresh day, fresh start
+  clearPnlSnapshots(); // fresh graph for the new day
   return record;
+}
+
+// ---------------------------------------------------------------------
+// P&L snapshots — a running log of "what was my total P&L at this
+// moment" through the day, cumulative and broken down per scanner.
+// This is what powers the equity-curve graph so you can see the peak
+// it reached and where it actually landed, not just the end number.
+// ---------------------------------------------------------------------
+const PNL_FILE = path.join(DATA_DIR, 'pnl-history.json');
+
+if (!fs.existsSync(PNL_FILE)) {
+  fs.writeFileSync(PNL_FILE, JSON.stringify({ snapshots: [] }, null, 2));
+}
+
+function readPnl() {
+  try {
+    return JSON.parse(fs.readFileSync(PNL_FILE, 'utf8'));
+  } catch (e) {
+    return { snapshots: [] };
+  }
+}
+
+function writePnl(data) {
+  const tmp = PNL_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.renameSync(tmp, PNL_FILE);
+}
+
+function addPnlSnapshot(snapshot) {
+  const data = readPnl();
+  data.snapshots.push(snapshot);
+  writePnl(data);
+}
+
+function getPnlSnapshots() {
+  return readPnl().snapshots;
+}
+
+function clearPnlSnapshots() {
+  writePnl({ snapshots: [] });
 }
 
 module.exports = {
   getAllTrades, addTrade, updateTrade, getOpenTrades, clearAllTrades, clearTradesByScanner,
   getDayHistory, getLastArchivedDate, archiveDay, isHalted, setHalted,
+  addPnlSnapshot, getPnlSnapshots, clearPnlSnapshots,
 };
