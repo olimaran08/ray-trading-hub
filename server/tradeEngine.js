@@ -141,6 +141,7 @@ async function exitAllOpenTrades() {
     const exitPrice = ltp == null ? trade.ltp : ltp;
     closed.push(closeTrade(trade, exitPrice, 'MANUAL EXIT ALL'));
   }
+  recordPnlSnapshot();
   return closed;
 }
 
@@ -200,7 +201,29 @@ async function monitorOpenTrades() {
     }
   }
 
+  recordPnlSnapshot();
   checkDayArchive();
+}
+
+// Log the current total P&L (and per-scanner breakdown) as one point
+// on today's equity curve. Only during a sane window (9 AM - 8 PM IST)
+// so the graph doesn't fill up with flat overnight noise.
+function recordPnlSnapshot() {
+  const now = istNow();
+  const hour = now.getHours();
+  if (hour < 9 || hour >= 20) return;
+
+  const trades = store.getAllTrades();
+  if (trades.length === 0) return; // nothing to plot yet today
+
+  const totalPnl = round2(trades.reduce((s, t) => s + (t.pnl || 0), 0));
+  const byScanner = {};
+  trades.forEach(t => {
+    const name = t.scanName || 'Unknown';
+    byScanner[name] = round2((byScanner[name] || 0) + (t.pnl || 0));
+  });
+
+  store.addPnlSnapshot({ time: now.toISOString(), totalPnl, byScanner });
 }
 
 function startMonitorLoop(intervalMs = 15000) {
@@ -225,5 +248,6 @@ module.exports = {
   resumeTrading,
   checkDayArchive,
   monitorOpenTrades,
+  recordPnlSnapshot,
   startMonitorLoop,
 };
