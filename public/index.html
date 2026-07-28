@@ -97,6 +97,18 @@
 
   <section class="board">
     <div class="board-head">
+      <h2>Today's P&amp;L curve</h2>
+    </div>
+    <p class="day-history-note" id="graphSubtitle">Shows the "All scanners" running total — pick a scanner above to see its own curve.</p>
+    <div class="chart-card">
+      <canvas id="pnlChart" height="220"></canvas>
+      <div id="chartEmpty" class="empty-state" style="display:none;"><p>No data yet — check back after your first trade of the day.</p></div>
+    </div>
+    <div class="chart-summary" id="chartSummary"></div>
+  </section>
+
+  <section class="board">
+    <div class="board-head">
       <h2>Open positions</h2>
       <span class="count-badge" id="openCount">0</span>
       <button id="exitAllBtn" class="btn-exit-all">Exit all</button>
@@ -158,6 +170,7 @@
 
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
