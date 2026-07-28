@@ -265,6 +265,113 @@ async function refreshDayHistory(){
   }
 }
 
+let pnlChart = null;
+let lastSnapshots = [];
+
+function shortTime(iso){
+  return new Date(iso).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true, timeZone:'Asia/Kolkata' });
+}
+
+function renderPnlChart(snapshots){
+  const canvas = document.getElementById('pnlChart');
+  const emptyState = document.getElementById('chartEmpty');
+  const summaryBox = document.getElementById('chartSummary');
+  const subtitle = document.getElementById('graphSubtitle');
+
+  subtitle.textContent = selectedScanner === 'ALL'
+    ? 'Shows the "All scanners" running total — pick a scanner above to see its own curve.'
+    : `Showing "${selectedScanner}" only.`;
+
+  if(!snapshots || snapshots.length === 0){
+    canvas.style.display = 'none';
+    emptyState.style.display = 'block';
+    summaryBox.innerHTML = '';
+    return;
+  }
+  canvas.style.display = 'block';
+  emptyState.style.display = 'none';
+
+  const labels = snapshots.map(s => shortTime(s.time));
+  const values = snapshots.map(s => selectedScanner === 'ALL' ? s.totalPnl : (s.byScanner[selectedScanner] || 0));
+
+  let peak = values[0], peakIdx = 0, low = values[0], lowIdx = 0;
+  values.forEach((v, i) => {
+    if(v > peak){ peak = v; peakIdx = i; }
+    if(v < low){ low = v; lowIdx = i; }
+  });
+  const current = values[values.length - 1];
+
+  summaryBox.innerHTML = `
+    <div class="chart-stat">
+      <span class="chart-stat-label">Peak</span>
+      <span class="chart-stat-value profit">${fmtMoney(peak)}</span>
+      <span class="chart-stat-time">${labels[peakIdx]}</span>
+    </div>
+    <div class="chart-stat">
+      <span class="chart-stat-label">Lowest</span>
+      <span class="chart-stat-value ${low >= 0 ? 'profit' : 'loss'}">${fmtMoney(low)}</span>
+      <span class="chart-stat-time">${labels[lowIdx]}</span>
+    </div>
+    <div class="chart-stat">
+      <span class="chart-stat-label">Right now</span>
+      <span class="chart-stat-value ${current >= 0 ? 'profit' : 'loss'}">${fmtMoney(current)}</span>
+      <span class="chart-stat-time">${labels[labels.length - 1]}</span>
+    </div>
+  `;
+
+  const lineColor = current >= 0 ? '#2FB170' : '#E5484D';
+
+  if(pnlChart){
+    pnlChart.data.labels = labels;
+    pnlChart.data.datasets[0].data = values;
+    pnlChart.data.datasets[0].borderColor = lineColor;
+    pnlChart.update('none');
+    return;
+  }
+
+  pnlChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: lineColor,
+        backgroundColor: 'rgba(193,68,14,0.08)',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        tension: 0.15,
+        fill: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#262E39' }, ticks: { color: '#8B93A1', maxTicksLimit: 6, font: { size: 10 } } },
+        y: {
+          grid: { color: '#262E39' },
+          ticks: { color: '#8B93A1', font: { size: 10 }, callback: v => '₹' + v.toLocaleString('en-IN') },
+        },
+      },
+    },
+  });
+}
+
+async function refreshPnlChart(){
+  try{
+    const r = await fetchJSON('/api/pnl-history');
+    if(r.ok){
+      lastSnapshots = r.snapshots;
+      renderPnlChart(lastSnapshots);
+    }
+  }catch(e){
+    console.error('pnl chart refresh failed', e);
+  }
+}
+
 async function refresh(){
   try{
     const [tradesRes, statsRes] = await Promise.all([
@@ -376,10 +483,13 @@ document.getElementById('scannerFilter').addEventListener('change', (e) => {
   document.getElementById('resetScannerBtn').style.display = selectedScanner === 'ALL' ? 'none' : 'inline-block';
   renderOpen(lastTrades);
   renderClosed(lastTrades);
+  renderPnlChart(lastSnapshots);
 });
 tickClock();
 setInterval(tickClock, 1000);
 refresh();
 refreshDayHistory();
+refreshPnlChart();
 setInterval(refresh, 5000);
 setInterval(refreshDayHistory, 30000);
+setInterval(refreshPnlChart, 15000);
