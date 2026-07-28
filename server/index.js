@@ -41,6 +41,7 @@ app.post('/webhook/chartink', (req, res) => {
 
     const skipped = symbols.length - created.length;
     console.log(`[webhook] ${scanName}: opened ${created.length} paper trade(s), skipped ${skipped} (duplicate stock or past 1:00 PM cutoff)`);
+    if (created.length > 0) engine.recordPnlSnapshot();
     res.json({ ok: true, opened: created.length, skipped, trades: created });
   } catch (err) {
     console.error('[webhook] error:', err);
@@ -62,6 +63,7 @@ app.post('/api/trades/manual', (req, res) => {
     return res.json({ ok: false, error: reason });
   }
   res.json({ ok: true, trade });
+  engine.recordPnlSnapshot();
 });
 
 app.get('/api/trades', (req, res) => {
@@ -73,6 +75,7 @@ app.post('/api/trades/:id/close', async (req, res) => {
   const trade = store.getAllTrades().find(t => t.id === id);
   if (!trade || trade.status !== 'OPEN') return res.status(404).json({ ok: false, error: 'Open trade not found' });
   const closed = engine.closeTrade(trade, trade.ltp, 'MANUAL CLOSE');
+  engine.recordPnlSnapshot();
   res.json({ ok: true, trade: closed });
 });
 
@@ -131,6 +134,12 @@ app.get('/api/export', async (req, res) => {
 });
 
 // Day-by-day P&L history (Day 1, Day 2, ...).
+// Today's equity curve — one point per minute of total P&L, plus a
+// per-scanner breakdown at each point, for the graph.
+app.get('/api/pnl-history', (req, res) => {
+  res.json({ ok: true, snapshots: store.getPnlSnapshots() });
+});
+
 app.get('/api/day-history', (req, res) => {
   res.json({ ok: true, days: store.getDayHistory() });
 });
