@@ -102,7 +102,7 @@
     </div>
     <p class="day-history-note" id="graphSubtitle">Shows the "All scanners" running total — pick a scanner above to see its own curve.</p>
     <div class="chart-card">
-      <canvas id="pnlChart" height="220"></canvas>
+      <div id="pnlChartContainer" class="pnl-chart-container"></div>
       <div id="chartEmpty" class="empty-state" style="display:none;"><p>No data yet — check back after your first trade of the day.</p></div>
     </div>
     <div class="chart-summary" id="chartSummary"></div>
@@ -171,7 +171,6 @@
 
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
