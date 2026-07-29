@@ -357,6 +357,19 @@ function renderPnlChart(snapshots){
         },
       },
     },
+    plugins: [{
+      // Canvases are transparent by default — paint a solid background
+      // so a downloaded/shared PNG doesn't look broken outside the app.
+      id: 'solidBackground',
+      beforeDraw: (chart) => {
+        const { ctx } = chart;
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = '#141920';
+        ctx.fillRect(0, 0, chart.width, chart.height);
+        ctx.restore();
+      },
+    }],
   });
 }
 
@@ -477,6 +490,18 @@ document.getElementById('resetScannerBtn').addEventListener('click', resetSelect
 document.getElementById('downloadReportBtn').addEventListener('click', () => {
   const scanner = encodeURIComponent(selectedScanner);
   window.location.href = `/api/export?scanner=${scanner}`;
+});
+document.getElementById('downloadChartBtn').addEventListener('click', () => {
+  if(!pnlChart){
+    alert('No chart data yet today — nothing to download.');
+    return;
+  }
+  const link = document.createElement('a');
+  const today = new Date().toLocaleDateString('en-IN', { timeZone:'Asia/Kolkata' }).replace(/\//g, '-');
+  const label = selectedScanner === 'ALL' ? 'All-Scanners' : selectedScanner.replace(/[^a-z0-9]+/gi, '-');
+  link.download = `RAY-Trading-Hub_${label}_${today}.png`;
+  link.href = pnlChart.toBase64Image();
+  link.click();
 });
 document.getElementById('scannerFilter').addEventListener('change', (e) => {
   selectedScanner = e.target.value;
