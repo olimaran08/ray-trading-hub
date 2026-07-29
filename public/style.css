@@ -202,6 +202,12 @@ a{color:var(--accent);}
   white-space:nowrap; font-family:var(--font-body); flex-shrink:0;
 }
 .btn-download:hover{background:var(--profit); color:#0B0E11;}
+.btn-download-chart{
+  margin-left:auto; background:var(--surface-2); border:1px solid var(--border); color:var(--text);
+  border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer;
+  font-family:var(--font-body); white-space:nowrap;
+}
+.btn-download-chart:hover{border-color:var(--accent); color:var(--accent);}
 .btn-reset-scanner{
   background:transparent; border:1px solid var(--amber); color:var(--amber); border-radius:9px;
   padding:9px 12px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;
