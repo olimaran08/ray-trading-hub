@@ -265,15 +265,70 @@ async function refreshDayHistory(){
   }
 }
 
-let pnlChart = null;
 let lastSnapshots = [];
+let lastChartSvgMarkup = ''; // used by the "Save as image" button
 
 function shortTime(iso){
   return new Date(iso).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true, timeZone:'Asia/Kolkata' });
 }
 
+// Builds a self-contained SVG line chart — no external chart library,
+// so it can never fail to load from a blocked/slow network. Returns
+// the SVG markup string; also draws it into the given container.
+function buildPnlSvg(labels, values, width, height){
+  const padX = 12, padY = 16;
+  const plotW = width - padX * 2;
+  const plotH = height - padY * 2;
+
+  const yMin = Math.min(...values, 0);
+  const yMax = Math.max(...values, 0);
+  const range = (yMax - yMin) || 1;
+
+  const xFor = i => values.length > 1 ? padX + (i * plotW) / (values.length - 1) : padX;
+  const yFor = v => padY + plotH - ((v - yMin) / range) * plotH;
+
+  const current = values[values.length - 1];
+  const lineColor = current >= 0 ? '#2FB170' : '#E5484D';
+
+  let peak = values[0], peakIdx = 0, low = values[0], lowIdx = 0;
+  values.forEach((v, i) => {
+    if(v > peak){ peak = v; peakIdx = i; }
+    if(v < low){ low = v; lowIdx = i; }
+  });
+
+  const points = values.map((v, i) => [xFor(i), yFor(v)]);
+  const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const baselineY = yFor(0);
+  const areaPath = linePath +
+    ` L${points[points.length - 1][0].toFixed(1)},${baselineY.toFixed(1)}` +
+    ` L${points[0][0].toFixed(1)},${baselineY.toFixed(1)} Z`;
+
+  const zeroLine = (yMin < 0 && yMax > 0)
+    ? `<line x1="${padX}" y1="${baselineY.toFixed(1)}" x2="${width - padX}" y2="${baselineY.toFixed(1)}" stroke="#3A4250" stroke-width="1" stroke-dasharray="3,3"/>`
+    : '';
+
+  const midIdx = Math.floor((labels.length - 1) / 2);
+  const timeLabels = labels.length > 1
+    ? `<text x="${padX}" y="${height - 3}" fill="#8B93A1" font-size="9" font-family="sans-serif" text-anchor="start">${labels[0]}</text>
+       <text x="${width / 2}" y="${height - 3}" fill="#8B93A1" font-size="9" font-family="sans-serif" text-anchor="middle">${labels[midIdx]}</text>
+       <text x="${width - padX}" y="${height - 3}" fill="#8B93A1" font-size="9" font-family="sans-serif" text-anchor="end">${labels[labels.length - 1]}</text>`
+    : '';
+
+  const peakDot = `<circle cx="${points[peakIdx][0].toFixed(1)}" cy="${points[peakIdx][1].toFixed(1)}" r="3.5" fill="#2FB170" stroke="#141920" stroke-width="1.5"/>`;
+  const lowDot = `<circle cx="${points[lowIdx][0].toFixed(1)}" cy="${points[lowIdx][1].toFixed(1)}" r="3.5" fill="#E5484D" stroke="#141920" stroke-width="1.5"/>`;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+    <rect x="0" y="0" width="${width}" height="${height}" fill="#141920"/>
+    ${zeroLine}
+    <path d="${areaPath}" fill="${lineColor}" fill-opacity="0.12" stroke="none"/>
+    <path d="${linePath}" fill="none" stroke="${lineColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${peakIdx !== lowIdx ? peakDot + lowDot : peakDot}
+    ${timeLabels}
+  </svg>`;
+}
+
 function renderPnlChart(snapshots){
-  const canvas = document.getElementById('pnlChart');
+  const container = document.getElementById('pnlChartContainer');
   const emptyState = document.getElementById('chartEmpty');
   const summaryBox = document.getElementById('chartSummary');
   const subtitle = document.getElementById('graphSubtitle');
@@ -283,12 +338,13 @@ function renderPnlChart(snapshots){
     : `Showing "${selectedScanner}" only.`;
 
   if(!snapshots || snapshots.length === 0){
-    canvas.style.display = 'none';
+    container.style.display = 'none';
     emptyState.style.display = 'block';
     summaryBox.innerHTML = '';
+    lastChartSvgMarkup = '';
     return;
   }
-  canvas.style.display = 'block';
+  container.style.display = 'block';
   emptyState.style.display = 'none';
 
   const labels = snapshots.map(s => shortTime(s.time));
@@ -319,58 +375,9 @@ function renderPnlChart(snapshots){
     </div>
   `;
 
-  const lineColor = current >= 0 ? '#2FB170' : '#E5484D';
-
-  if(pnlChart){
-    pnlChart.data.labels = labels;
-    pnlChart.data.datasets[0].data = values;
-    pnlChart.data.datasets[0].borderColor = lineColor;
-    pnlChart.update('none');
-    return;
-  }
-
-  pnlChart = new Chart(canvas.getContext('2d'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        data: values,
-        borderColor: lineColor,
-        backgroundColor: 'rgba(193,68,14,0.08)',
-        borderWidth: 2,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        tension: 0.15,
-        fill: true,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { color: '#262E39' }, ticks: { color: '#8B93A1', maxTicksLimit: 6, font: { size: 10 } } },
-        y: {
-          grid: { color: '#262E39' },
-          ticks: { color: '#8B93A1', font: { size: 10 }, callback: v => '₹' + v.toLocaleString('en-IN') },
-        },
-      },
-    },
-    plugins: [{
-      // Canvases are transparent by default — paint a solid background
-      // so a downloaded/shared PNG doesn't look broken outside the app.
-      id: 'solidBackground',
-      beforeDraw: (chart) => {
-        const { ctx } = chart;
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-over';
-        ctx.fillStyle = '#141920';
-        ctx.fillRect(0, 0, chart.width, chart.height);
-        ctx.restore();
-      },
-    }],
-  });
+  // Small SVG for on-screen display, larger one cached for a crisper download.
+  container.innerHTML = buildPnlSvg(labels, values, 600, 200);
+  lastChartSvgMarkup = buildPnlSvg(labels, values, 1000, 400);
 }
 
 async function refreshPnlChart(){
@@ -492,16 +499,37 @@ document.getElementById('downloadReportBtn').addEventListener('click', () => {
   window.location.href = `/api/export?scanner=${scanner}`;
 });
 document.getElementById('downloadChartBtn').addEventListener('click', () => {
-  if(!pnlChart){
+  if(!lastChartSvgMarkup || lastSnapshots.length === 0){
     alert('No chart data yet today — nothing to download.');
     return;
   }
-  const link = document.createElement('a');
   const today = new Date().toLocaleDateString('en-IN', { timeZone:'Asia/Kolkata' }).replace(/\//g, '-');
   const label = selectedScanner === 'ALL' ? 'All-Scanners' : selectedScanner.replace(/[^a-z0-9]+/gi, '-');
-  link.download = `RAY-Trading-Hub_${label}_${today}.png`;
-  link.href = pnlChart.toBase64Image();
-  link.click();
+  const filename = `RAY-Trading-Hub_${label}_${today}.png`;
+
+  // Rasterize our own SVG to a PNG via an offscreen canvas — no
+  // external library, so this can't fail from a blocked network.
+  const svgBlob = new Blob([lastChartSvgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    alert('Could not generate the image — try again.');
+  };
+  img.src = url;
 });
 document.getElementById('scannerFilter').addEventListener('change', (e) => {
   selectedScanner = e.target.value;
