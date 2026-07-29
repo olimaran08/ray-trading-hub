@@ -224,6 +224,8 @@ a{color:var(--accent);}
   background:var(--surface); border:1px solid var(--border); border-radius:14px;
   padding:16px 12px 8px; position:relative;
 }
+.pnl-chart-container{width:100%; min-height:200px;}
+.pnl-chart-container svg{width:100%; height:auto; display:block;}
 .chart-summary{
   display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px;
 }
