@@ -276,7 +276,7 @@ function shortTime(iso){
 // so it can never fail to load from a blocked/slow network. Returns
 // the SVG markup string; also draws it into the given container.
 function buildPnlSvg(labels, values, width, height){
-  const padX = 12, padY = 16;
+  const padX = CHART_PAD_X, padY = CHART_PAD_Y;
   const plotW = width - padX * 2;
   const plotH = height - padY * 2;
 
@@ -327,11 +327,15 @@ function buildPnlSvg(labels, values, width, height){
   </svg>`;
 }
 
+const CHART_PAD_X = 12, CHART_PAD_Y = 16;
+let lastChartMeta = null; // used by the tap-to-inspect handler
+
 function renderPnlChart(snapshots){
   const container = document.getElementById('pnlChartContainer');
   const emptyState = document.getElementById('chartEmpty');
   const summaryBox = document.getElementById('chartSummary');
   const subtitle = document.getElementById('graphSubtitle');
+  const tapHint = document.getElementById('chartTapHint');
 
   subtitle.textContent = selectedScanner === 'ALL'
     ? 'Shows the "All scanners" running total — pick a scanner above to see its own curve.'
@@ -342,10 +346,14 @@ function renderPnlChart(snapshots){
     emptyState.style.display = 'block';
     summaryBox.innerHTML = '';
     lastChartSvgMarkup = '';
+    lastChartMeta = null;
+    tapHint.style.display = 'none';
+    hideTouchOverlay();
     return;
   }
   container.style.display = 'block';
   emptyState.style.display = 'none';
+  tapHint.style.display = 'block';
 
   const labels = snapshots.map(s => shortTime(s.time));
   const values = snapshots.map(s => selectedScanner === 'ALL' ? s.totalPnl : (s.byScanner[selectedScanner] || 0));
@@ -375,9 +383,15 @@ function renderPnlChart(snapshots){
     </div>
   `;
 
+  const width = 600, height = 200;
+  const yMin = Math.min(...values, 0);
+  const yMax = Math.max(...values, 0);
+
   // Small SVG for on-screen display, larger one cached for a crisper download.
-  container.innerHTML = buildPnlSvg(labels, values, 600, 200);
+  container.innerHTML = buildPnlSvg(labels, values, width, height);
   lastChartSvgMarkup = buildPnlSvg(labels, values, 1000, 400);
+  lastChartMeta = { labels, values, width, height, yMin, yMax };
+  hideTouchOverlay();
 }
 
 async function refreshPnlChart(){
@@ -390,6 +404,66 @@ async function refreshPnlChart(){
   }catch(e){
     console.error('pnl chart refresh failed', e);
   }
+}
+
+function hideTouchOverlay(){
+  document.getElementById('chartTouchLine').style.display = 'none';
+  document.getElementById('chartTouchDot').style.display = 'none';
+  document.getElementById('chartTouchLabel').style.display = 'none';
+}
+
+// Tap-to-inspect: find the nearest recorded point to wherever the
+// person tapped/clicked on the chart, and show its exact time + P&L.
+function inspectChartAt(clientX){
+  if(!lastChartMeta) return;
+  const container = document.getElementById('pnlChartContainer');
+  const rect = container.getBoundingClientRect();
+  if(rect.width === 0) return;
+
+  const { labels, values, width, height, yMin, yMax } = lastChartMeta;
+  const relX = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  const svgX = relX * width;
+
+  const plotW = width - CHART_PAD_X * 2;
+  const n = values.length;
+  let idx = n > 1 ? Math.round(((svgX - CHART_PAD_X) / plotW) * (n - 1)) : 0;
+  idx = Math.min(n - 1, Math.max(0, idx));
+
+  const value = values[idx];
+  const label = labels[idx];
+
+  const plotH = height - CHART_PAD_Y * 2;
+  const range = (yMax - yMin) || 1;
+  const pointX = n > 1 ? CHART_PAD_X + (idx * plotW) / (n - 1) : CHART_PAD_X;
+  const pointY = CHART_PAD_Y + plotH - ((value - yMin) / range) * plotH;
+
+  const leftPct = (pointX / width) * 100;
+  const topPct = (pointY / height) * 100;
+
+  const line = document.getElementById('chartTouchLine');
+  const dot = document.getElementById('chartTouchDot');
+  const labelEl = document.getElementById('chartTouchLabel');
+
+  line.style.left = leftPct + '%';
+  line.style.display = 'block';
+
+  dot.style.left = leftPct + '%';
+  dot.style.top = topPct + '%';
+  dot.style.display = 'block';
+
+  const cls = value >= 0 ? 'profit' : 'loss';
+  labelEl.innerHTML = `${label} · <span class="${cls}">${fmtMoney(value)}</span>`;
+  labelEl.style.left = Math.min(88, Math.max(12, leftPct)) + '%';
+  labelEl.style.top = Math.max(12, topPct) + '%';
+  labelEl.style.display = 'block';
+}
+
+function setupChartTouch(){
+  const card = document.getElementById('chartCard');
+  card.addEventListener('click', (e) => inspectChartAt(e.clientX));
+  card.addEventListener('touchstart', (e) => {
+    if(e.touches && e.touches[0]) inspectChartAt(e.touches[0].clientX);
+  }, { passive: true });
 }
 
 async function refresh(){
@@ -490,6 +564,7 @@ async function resetSelectedScanner(){
 }
 
 setupWebhookBox();
+setupChartTouch();
 document.getElementById('exitAllBtn').addEventListener('click', exitAll);
 document.getElementById('closeForTodayBtn').addEventListener('click', closeForToday);
 document.getElementById('resumeTradingBtn').addEventListener('click', resumeTrading);
@@ -506,6 +581,7 @@ document.getElementById('downloadChartBtn').addEventListener('click', () => {
   const today = new Date().toLocaleDateString('en-IN', { timeZone:'Asia/Kolkata' }).replace(/\//g, '-');
   const label = selectedScanner === 'ALL' ? 'All-Scanners' : selectedScanner.replace(/[^a-z0-9]+/gi, '-');
   const filename = `RAY-Trading-Hub_${label}_${today}.png`;
+  const DOWNLOAD_W = 1000, DOWNLOAD_H = 400; // must match the size buildPnlSvg was called with
 
   // Rasterize our own SVG to a PNG via an offscreen canvas — no
   // external library, so this can't fail from a blocked network.
@@ -514,16 +590,36 @@ document.getElementById('downloadChartBtn').addEventListener('click', () => {
   const img = new Image();
   img.onload = () => {
     const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
+    // Use the known size we generated the SVG at — img.width/height
+    // from an SVG-sourced Image is unreliable on iOS Safari.
+    canvas.width = DOWNLOAD_W;
+    canvas.height = DOWNLOAD_H;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, 0, 0, DOWNLOAD_W, DOWNLOAD_H);
     URL.revokeObjectURL(url);
 
-    const link = document.createElement('a');
-    link.download = filename;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    const pngUrl = canvas.toDataURL('image/png');
+
+    // iOS Safari mostly ignores the `download` attribute on links, so
+    // the reliable cross-device pattern is to open the image itself —
+    // the person then taps-and-holds to save it to Photos.
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if(isIOS){
+      const win = window.open();
+      if(win){
+        win.document.write(`<title>${filename}</title><body style="margin:0;background:#141920;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${pngUrl}" style="max-width:100%;height:auto;" /></body>`);
+      } else {
+        window.location.href = pngUrl;
+      }
+      alert('Your P&L graph opened in a new tab — press and hold the image, then choose "Save to Photos".');
+    } else {
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = pngUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
   img.onerror = () => {
     URL.revokeObjectURL(url);
