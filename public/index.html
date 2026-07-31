@@ -101,9 +101,13 @@
       <button id="downloadChartBtn" class="btn-download-chart">⬇ Save as image</button>
     </div>
     <p class="day-history-note" id="graphSubtitle">Shows the "All scanners" running total — pick a scanner above to see its own curve.</p>
-    <div class="chart-card">
+    <p class="day-history-note chart-tap-hint" id="chartTapHint">👆 Tap anywhere on the graph to see the exact time and P&amp;L at that point.</p>
+    <div class="chart-card" id="chartCard">
       <div id="pnlChartContainer" class="pnl-chart-container"></div>
       <div id="chartEmpty" class="empty-state" style="display:none;"><p>No data yet — check back after your first trade of the day.</p></div>
+      <div id="chartTouchLine" class="chart-touch-line" style="display:none;"></div>
+      <div id="chartTouchDot" class="chart-touch-dot" style="display:none;"></div>
+      <div id="chartTouchLabel" class="chart-touch-label" style="display:none;"></div>
     </div>
     <div class="chart-summary" id="chartSummary"></div>
   </section>
