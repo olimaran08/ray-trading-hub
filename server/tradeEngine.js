@@ -209,8 +209,7 @@ async function monitorOpenTrades() {
 // on today's equity curve. Only during a sane window (9 AM - 8 PM IST)
 // so the graph doesn't fill up with flat overnight noise.
 function recordPnlSnapshot() {
-  const now = istNow();
-  const hour = now.getHours();
+  const hour = istNow().getHours();
   if (hour < 9 || hour >= 20) return;
 
   const trades = store.getAllTrades();
@@ -223,7 +222,12 @@ function recordPnlSnapshot() {
     byScanner[name] = round2((byScanner[name] || 0) + (t.pnl || 0));
   });
 
-  store.addPnlSnapshot({ time: now.toISOString(), totalPnl, byScanner });
+  // Store a genuine UTC timestamp — the browser applies the IST shift
+  // once, correctly, when displaying it. (Using istNow().toISOString()
+  // here was the bug: that Date is already artificially shifted +5:30
+  // for local reading, so re-serializing it as ISO double-counts the
+  // offset and the graph shows times ~5.5 hours ahead of reality.)
+  store.addPnlSnapshot({ time: new Date().toISOString(), totalPnl, byScanner });
 }
 
 function startMonitorLoop(intervalMs = 15000) {
