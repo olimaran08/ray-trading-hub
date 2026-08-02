@@ -116,9 +116,10 @@ function renderScannerPerf(trades){
   const byScanner = {};
   trades.forEach(t => {
     const name = t.scanName || 'Unknown';
-    if(!byScanner[name]) byScanner[name] = { name, trades: 0, wins: 0, losses: 0, pnl: 0 };
+    if(!byScanner[name]) byScanner[name] = { name, trades: 0, wins: 0, losses: 0, pnl: 0, invested: 0 };
     byScanner[name].trades++;
     byScanner[name].pnl += (t.pnl || 0);
+    byScanner[name].invested += (t.margin || 0);
     if(t.status === 'CLOSED'){
       if(t.pnl > 0) byScanner[name].wins++;
       else byScanner[name].losses++;
@@ -144,7 +145,7 @@ function renderScannerPerf(trades){
       <span class="scanner-rank">#${i+1}</span>
       <div class="scanner-name-col">
         <div class="scanner-name">${r.name}</div>
-        <div class="scanner-sub">${r.trades} trades · ${winRate}% win rate (${r.wins}W/${r.losses}L)</div>
+        <div class="scanner-sub">${r.trades} trades · Invested ${fmtMoney(r.invested)} · ${winRate}% win rate (${r.wins}W/${r.losses}L)</div>
         <div class="scanner-bar-track"><div class="scanner-bar-fill ${cls}" style="width:${barWidth}%"></div></div>
       </div>
       <span class="scanner-pnl ${cls}">${fmtMoney(r.pnl)}</span>
@@ -466,6 +467,16 @@ function setupChartTouch(){
   }, { passive: true });
 }
 
+function renderInvestedSummary(trades){
+  const totalInvested = trades.reduce((s, t) => s + (t.margin || 0), 0);
+  const count = trades.length;
+  const avg = count ? totalInvested / count : 0;
+
+  document.getElementById('totalInvested').textContent = fmtMoney(totalInvested);
+  document.getElementById('totalTradesCount').textContent = count;
+  document.getElementById('avgPerTrade').textContent = fmtMoney(avg);
+}
+
 async function refresh(){
   try{
     const [tradesRes, statsRes] = await Promise.all([
@@ -478,6 +489,7 @@ async function refresh(){
       renderOpen(lastTrades);
       renderClosed(lastTrades);
       renderScannerPerf(lastTrades);
+      renderInvestedSummary(lastTrades);
     }
     if(statsRes.ok){
       renderStats(statsRes.stats, statsRes.marketOpen, statsRes.haltedForToday);
