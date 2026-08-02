@@ -582,9 +582,19 @@ document.getElementById('downloadChartBtn').addEventListener('click', () => {
   const label = selectedScanner === 'ALL' ? 'All-Scanners' : selectedScanner.replace(/[^a-z0-9]+/gi, '-');
   const filename = `RAY-Trading-Hub_${label}_${today}.png`;
   const DOWNLOAD_W = 1000, DOWNLOAD_H = 400; // must match the size buildPnlSvg was called with
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-  // Rasterize our own SVG to a PNG via an offscreen canvas — no
-  // external library, so this can't fail from a blocked network.
+  // CRITICAL for iOS: window.open() must happen synchronously, as a
+  // direct result of this click — not inside an async callback later.
+  // Opening it here (even blank) and writing into it once the image
+  // is ready is what keeps Safari/Chrome-iOS from silently blocking it
+  // as a popup. This was the actual bug — the window.open() used to
+  // happen inside img.onload, after the click's gesture had expired.
+  let preOpenedWindow = null;
+  if(isIOS){
+    preOpenedWindow = window.open('', '_blank');
+  }
+
   const svgBlob = new Blob([lastChartSvgMarkup], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);
   const img = new Image();
@@ -600,15 +610,12 @@ document.getElementById('downloadChartBtn').addEventListener('click', () => {
 
     const pngUrl = canvas.toDataURL('image/png');
 
-    // iOS Safari mostly ignores the `download` attribute on links, so
-    // the reliable cross-device pattern is to open the image itself —
-    // the person then taps-and-holds to save it to Photos.
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     if(isIOS){
-      const win = window.open();
-      if(win){
-        win.document.write(`<title>${filename}</title><body style="margin:0;background:#141920;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${pngUrl}" style="max-width:100%;height:auto;" /></body>`);
+      if(preOpenedWindow && !preOpenedWindow.closed){
+        preOpenedWindow.document.write(`<title>${filename}</title><body style="margin:0;background:#141920;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${pngUrl}" style="max-width:100%;height:auto;" /></body>`);
       } else {
+        // Popup was blocked despite the synchronous open — last resort,
+        // navigate this tab to the image directly.
         window.location.href = pngUrl;
       }
       alert('Your P&L graph opened in a new tab — press and hold the image, then choose "Save to Photos".');
@@ -623,6 +630,7 @@ document.getElementById('downloadChartBtn').addEventListener('click', () => {
   };
   img.onerror = () => {
     URL.revokeObjectURL(url);
+    if(preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close();
     alert('Could not generate the image — try again.');
   };
   img.src = url;
