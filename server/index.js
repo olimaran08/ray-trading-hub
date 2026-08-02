@@ -118,7 +118,16 @@ app.get('/api/export', async (req, res) => {
     }
 
     const label = scanner && scanner !== 'ALL' ? scanner : 'All Scanners';
-    const buffer = await buildTradeReport(trades, label);
+
+    // Build the same "Time + Cumulative P&L" series the on-screen
+    // graph uses, filtered to match whichever scanner was selected.
+    const snapshots = store.getPnlSnapshots();
+    const pnlTimeline = snapshots.map(s => ({
+      time: new Date(s.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }),
+      value: scanner && scanner !== 'ALL' ? (s.byScanner[scanner] || 0) : s.totalPnl,
+    }));
+
+    const buffer = await buildTradeReport(trades, label, pnlTimeline);
 
     const today = engine.istDateStr();
     const safeLabel = label.replace(/[^a-z0-9]+/gi, '-');
