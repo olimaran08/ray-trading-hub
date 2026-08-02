@@ -130,6 +130,20 @@ a{color:var(--accent);}
 .stat-num{display:block; font-family:var(--font-mono); font-size:20px; font-weight:600;}
 .stat-label{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;}
 
+/* ---------- invested summary ---------- */
+.invested-card{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:0;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  margin-bottom:24px; overflow:hidden;
+}
+.invested-block{
+  padding:14px 10px; text-align:center; border-right:1px solid var(--border);
+  display:flex; flex-direction:column; gap:3px;
+}
+.invested-block:last-child{border-right:none;}
+.invested-label{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em;}
+.invested-value{font-family:var(--font-mono); font-size:16px; font-weight:600; color:var(--accent);}
+
 /* ---------- rules strip ---------- */
 .rules-strip{
   display:flex; gap:0; overflow-x:auto; margin-bottom:24px; border:1px solid var(--border);
