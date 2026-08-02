@@ -19,7 +19,7 @@ const RED_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE
 const RED_FONT = { color: { argb: 'FF9C0006' } };
 const NEUTRAL_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
 
-async function buildTradeReport(trades, scannerLabel) {
+async function buildTradeReport(trades, scannerLabel, pnlTimeline) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'RAY Trading Hub';
   wb.created = new Date();
@@ -87,6 +87,35 @@ async function buildTradeReport(trades, scannerLabel) {
   summaryRow.font = { bold: true };
   summaryRow.getCell('pnl').fill = totalPnl >= 0 ? GREEN_FILL : RED_FILL;
   summaryRow.getCell('pnl').font = { bold: true, color: (totalPnl >= 0 ? GREEN_FONT : RED_FONT).color };
+
+  // Second sheet: just Time + Cumulative P&L, in plain number/text
+  // columns — select both columns in the Excel or Sheets app and tap
+  // Insert > Chart to get a real, native, interactive line chart with
+  // tap/hover tooltips built by Excel itself (exceljs itself can't
+  // embed a chart object directly into the file).
+  if (pnlTimeline && pnlTimeline.length > 0) {
+    const chartSheet = wb.addWorksheet('P&L Timeline (select & chart)', {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    });
+    chartSheet.columns = [
+      { header: 'Time (IST)', key: 'time', width: 14 },
+      { header: 'Cumulative P&L (₹)', key: 'pnl', width: 20 },
+    ];
+    chartSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    chartSheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC1440E' } };
+
+    pnlTimeline.forEach(point => {
+      const row = chartSheet.addRow({ time: point.time, pnl: point.value });
+      row.getCell('pnl').fill = point.value >= 0 ? GREEN_FILL : RED_FILL;
+      row.getCell('pnl').font = { color: (point.value >= 0 ? GREEN_FONT : RED_FONT).color };
+    });
+
+    chartSheet.getCell('D1').value = 'How to make this interactive:';
+    chartSheet.getCell('D1').font = { bold: true };
+    chartSheet.getCell('D2').value = '1. Select columns A and B (tap-drag across the data)';
+    chartSheet.getCell('D3').value = '2. Tap Insert → Chart → Line Chart';
+    chartSheet.getCell('D4').value = '3. Excel/Sheets draws a real interactive chart — tap any point to see its value';
+  }
 
   return wb.xlsx.writeBuffer();
 }
